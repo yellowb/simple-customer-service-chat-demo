@@ -1,169 +1,67 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
-
-	"github.com/gin-gonic/gin"
+	"yellowb.com/chat-demo/router"
+	"yellowb.com/chat-demo/stream_server"
 )
 
-var counter = 1
-
-// It keeps a list of clients those are currently attached
-// and broadcasting events to those clients.
-type Event struct {
-	// Events are pushed to this channel by the main events-gathering routine
-	Message chan string
-
-	// New client connections
-	NewClients chan chan string
-
-	// Closed client connections
-	ClosedClients chan chan string
-
-	// Total client connections
-	TotalClients map[chan string]bool
-}
-
-// New event messages are broadcast to all registered client connection channels
-type ClientChan chan string
-
 func main() {
-	router := gin.Default()
+	// start api server...
+	r, err := router.InitRouter()
+	if err != nil {
+		panic(fmt.Sprintf("[main] init router error: %s", err.Error()))
+	}
+	webServer := &http.Server{
+		Addr:           ":8085",
+		Handler:        r,
+		ReadTimeout:    3 * time.Minute,
+		WriteTimeout:   3 * time.Minute,
+		IdleTimeout:    30 * time.Minute,
+		MaxHeaderBytes: http.DefaultMaxHeaderBytes,
+	}
 
-	// Initialize new streaming server
-	stream := NewServer()
-
-	// We are streaming current time to clients in the interval 10 seconds
 	go func() {
+		// 启动WebServer开始监听请求
+		if err := webServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("[main] start web server error: %v", err)
+		}
+	}()
+
+	// TODO: 后面删掉
+	go func() {
+		streamServer := stream_server.GetSSEventStreamServer()
 		for {
 			time.Sleep(time.Second * 10)
 			now := time.Now().Format("2006-01-02 15:04:05")
 			currentTime := fmt.Sprintf("The Current Time Is %v", now)
 
 			// Send current time to clients message channel
-			stream.Message <- currentTime
+			streamServer.Message <- currentTime
 		}
 	}()
 
-	// Basic Authentication
-	authorized := router.Group("/")
+	// graceful shutdown...
+	quit := make(chan os.Signal)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("[main] shutdown web server ...")
 
-	// Authorized client can stream the event
-	// Add event-streaming headers
-	authorized.GET("/stream", HeadersMiddleware(), stream.serveHTTP(), func(c *gin.Context) {
-		v, ok := c.Get("clientChan")
-		if !ok {
-			return
-		}
-		clientChan, ok := v.(ClientChan)
-		if !ok {
-			return
-		}
-
-		vSid, ok := c.Get("stream-id")
-		if !ok {
-			return
-		}
-		sid, ok := vSid.(string)
-		if !ok {
-			return
-		}
-
-		clientLose := c.Stream(func(w io.Writer) bool {
-			// Stream message to client from message channel
-
-			msg, ok := <-clientChan
-			if ok {
-				c.SSEvent("message", fmt.Sprintf("%s - %s", msg, sid))
-				return true
-			} else {
-				fmt.Println("clientChan is closed")
-			}
-			return false
-		})
-
-		if clientLose {
-			fmt.Printf("client - %s is lost\n", vSid)
-		} else {
-			fmt.Printf("client - %s is stopped\n", vSid)
-		}
-	})
-
-	// Parse Static files
-	router.StaticFile("/", "./public/index.html")
-
-	router.Run(":8085")
-}
-
-// Initialize event and Start procnteessing requests
-func NewServer() (event *Event) {
-	event = &Event{
-		Message:       make(chan string),
-		NewClients:    make(chan chan string),
-		ClosedClients: make(chan chan string),
-		TotalClients:  make(map[chan string]bool),
+	// 关闭WebServer
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := webServer.Shutdown(ctx); err != nil {
+		log.Fatal("[main] server shutdown: ", err)
 	}
+	log.Println("[main] shutdown web server ok")
 
-	go event.listen()
-
-	return
-}
-
-// It Listens all incoming requests from clients.
-// Handles addition and removal of clients and broadcast messages to clients.
-func (stream *Event) listen() {
-	for {
-		select {
-		// Add new available client
-		case client := <-stream.NewClients:
-			stream.TotalClients[client] = true
-			log.Printf("Client added. %d registered clients", len(stream.TotalClients))
-
-		// Remove closed client
-		case client := <-stream.ClosedClients:
-			delete(stream.TotalClients, client)
-			close(client)
-			log.Printf("Removed client. %d registered clients", len(stream.TotalClients))
-
-		// Broadcast message to client
-		case eventMsg := <-stream.Message:
-			for clientMessageChan := range stream.TotalClients {
-				clientMessageChan <- eventMsg
-			}
-		}
-	}
-}
-
-func (stream *Event) serveHTTP() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Initialize client channel
-		clientChan := make(ClientChan)
-
-		// Send new connection to event server
-		stream.NewClients <- clientChan
-
-		defer func() {
-			// Send closed connection to event server
-			stream.ClosedClients <- clientChan
-		}()
-
-		c.Set("clientChan", clientChan)
-		c.Set("stream-id", fmt.Sprintf("%d", counter))
-		counter++
-
-		c.Next()
-	}
-}
-
-func HeadersMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		c.Writer.Header().Set("Cache-Control", "no-cache")
-		c.Writer.Header().Set("Connection", "keep-alive")
-		c.Writer.Header().Set("Transfer-Encoding", "chunked")
-		c.Next()
-	}
+	log.Println("[main] server exiting")
 }
