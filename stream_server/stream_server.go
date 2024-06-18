@@ -7,10 +7,17 @@ import (
 )
 
 const (
-	heartbeatInterval = time.Second * 15 // 心跳保活间隔
+	heartbeatInterval = time.Second * 10 // 心跳保活间隔
 )
 
-type ClientChan chan string
+// SSEvent SSE事件消息体
+type SSEvent struct {
+	Type string `json:"type"`
+	Body string `json:"body"`
+}
+
+// ClientChan 面向单个客户端的推流Channel
+type ClientChan chan *SSEvent
 
 var (
 	once   sync.Once
@@ -20,7 +27,7 @@ var (
 // SSEventStreamServer SSE推流服务器
 type SSEventStreamServer struct {
 	// Events are pushed to this channel by the main events-gathering routine
-	Message chan string
+	Message ClientChan
 
 	// New client connections
 	NewClients chan ClientChan
@@ -35,7 +42,7 @@ type SSEventStreamServer struct {
 func GetSSEventStreamServer() *SSEventStreamServer {
 	once.Do(func() {
 		server = &SSEventStreamServer{
-			Message:       make(chan string),
+			Message:       make(chan *SSEvent),
 			NewClients:    make(chan ClientChan),
 			ClosedClients: make(chan ClientChan),
 			TotalClients:  make(map[ClientChan]bool),
@@ -81,6 +88,8 @@ func (s *SSEventStreamServer) keepAlive() {
 
 	for {
 		<-ticker.C
-		s.Message <- "heartbeat"
+		s.Message <- &SSEvent{
+			Type: "heartbeat",
+		}
 	}
 }

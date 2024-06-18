@@ -43,7 +43,7 @@ func (h *SSEventStreamHandler) AcceptNewClient() gin.HandlerFunc {
 		c.Stream(func(w io.Writer) bool {
 			// Stream message to client from message channel
 			if msg, ok := <-clientChan; ok {
-				c.SSEvent("message", fmt.Sprintf("%s - %s", msg, streamId))
+				c.SSEvent(msg.Type, msg.Body)
 				return true
 			}
 			return false

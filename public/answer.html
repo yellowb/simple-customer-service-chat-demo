@@ -13,9 +13,10 @@
 回答: <input id="content" type="text" size="100" name="LastName" value="Mouse"><br>
 <button id="submit_btn">提交</button>
 
+<p>最近一次心跳时间：</p>
+<div class="heart-beat-time"></div>
+
 <p>下面是聊天记录：</p>
-
-
 <div class="event-data"></div>
 
 
@@ -78,6 +79,17 @@
                     let allMsgText = renderMsg(data.messages)
                     $('.event-data').append(allMsgText)
                 });
+        });
+
+        stream.addEventListener("heartbeat", function(e){
+            $('.heart-beat-time').empty()
+            let now = new Date()
+            $('.heart-beat-time').append(now.toString())
+        });
+
+        stream.addEventListener("error", function(e){
+            $('.heart-beat-time').empty()
+            $('.heart-beat-time').append("服务端失去链接")
         });
     });
 
