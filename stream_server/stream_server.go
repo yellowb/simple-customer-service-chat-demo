@@ -23,22 +23,22 @@ type SSEventStreamServer struct {
 	Message chan string
 
 	// New client connections
-	NewClients chan chan string
+	NewClients chan ClientChan
 
 	// Closed client connections
-	ClosedClients chan chan string
+	ClosedClients chan ClientChan
 
 	// Total client connections
-	TotalClients map[chan string]bool
+	TotalClients map[ClientChan]bool
 }
 
 func GetSSEventStreamServer() *SSEventStreamServer {
 	once.Do(func() {
 		server = &SSEventStreamServer{
 			Message:       make(chan string),
-			NewClients:    make(chan chan string),
-			ClosedClients: make(chan chan string),
-			TotalClients:  make(map[chan string]bool),
+			NewClients:    make(chan ClientChan),
+			ClosedClients: make(chan ClientChan),
+			TotalClients:  make(map[ClientChan]bool),
 		}
 		server.run() // 创建时即启动监听
 	})

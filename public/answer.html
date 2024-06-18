@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>回答问题</title>
+</head>
+<body>
+
+<script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+
+客服ID(你是谁): <input id="helper_id" type="text" name="FirstName" value="Tom"><br>
+客户ID(你要跟谁对话): <input id="user_id" type="text" name="FirstName" value="Mickey"><br>
+回答: <input id="content" type="text" size="100" name="LastName" value="Mouse"><br>
+<button id="submit_btn">提交</button>
+
+<p>下面是聊天记录：</p>
+
+
+<div class="event-data"></div>
+
+
+<script>
+
+    let renderMsg = function (messages) {
+        let msgStr = "";
+        for (let i = 0; i < messages.length; i++) {
+            let date = new Date(messages[i].ts * 1000)
+            msgStr = msgStr + date.toString() + " : ";
+            if (messages[i].from_customer) {
+                msgStr = msgStr + "(问题)";
+                msgStr = msgStr + messages[i].user + " : ";
+            } else {
+                msgStr = msgStr + "(回答)";
+                msgStr = msgStr + messages[i].helper + " : ";
+            }
+
+            msgStr = msgStr + messages[i].text;
+            msgStr = msgStr + "</br>";
+        }
+        return msgStr;
+    }
+
+    $(document).ready(function () {
+
+        $("#submit_btn").click(function () {
+            let helperId = $("#helper_id").val();
+            let userId = $("#user_id").val();
+            let content = $("#content").val();
+
+            $.ajax({
+                type: 'POST',
+                url: 'api/add_message',
+                data: JSON.stringify({user: userId, helper: helperId, text: content, from_customer: false}),
+                // success: function(data) { console.log('data: ' + data); },
+                contentType: "application/json",
+                dataType: 'json'
+            })
+                .done(function (data) {
+                    console.log('data: ' + data);
+                });
+        });
+
+
+        // 打开SSE流接受推送通知
+        let stream = new EventSource("/api/stream");
+        stream.addEventListener("message", function(e){
+            let userId = $("#user_id").val();  // 客户ID
+
+            $.ajax({
+                type: 'GET',
+                url: 'api/messages?user_id=' + userId,
+                contentType: "application/json",
+                dataType: 'json'
+            })
+                .done(function (data) {
+                    $('.event-data').empty()
+
+                    let allMsgText = renderMsg(data.messages)
+                    $('.event-data').append(allMsgText)
+                });
+        });
+    });
+
+
+</script>
+
+</body>
+</html>

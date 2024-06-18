@@ -1,42 +1,43 @@
 package fake_db
 
+import (
+	"sync"
+	"yellowb.com/chat-demo/dto"
+)
+
+var (
+	once sync.Once
+	db   *FakeDb
+)
+
 // FakeDb 假的DB
 type FakeDb struct {
-	Data map[string]*CustomerMessages // 跟所有客户的交谈记录。key = 客户user id
+	Data map[string]*dto.CustomerMessages // 跟所有客户的交谈记录。key = 客户user id
+}
+
+func GetFakeDb() *FakeDb {
+	once.Do(func() {
+		db = &FakeDb{
+			Data: make(map[string]*dto.CustomerMessages),
+		}
+	})
+	return db
 }
 
 // GetCustomerMessages 获取跟某个客户的所有交谈消息集合
-func (f *FakeDb) GetCustomerMessages(user string) *CustomerMessages {
+func (f *FakeDb) GetCustomerMessages(user string) *dto.CustomerMessages {
 	return f.Data[user]
 }
 
 // SaveCustomerMessage 保存跟某个客户的一条交谈消息
-func (f *FakeDb) SaveCustomerMessage(user string, message *Message) {
-	var customerMessages *CustomerMessages
+func (f *FakeDb) SaveCustomerMessage(user string, message *dto.Message) {
+	var customerMessages *dto.CustomerMessages
 	// 如果某个客户从来没交谈过，则新建
 	if customerMessages = f.Data[user]; customerMessages == nil {
-		customerMessages = &CustomerMessages{
-			Messages: make([]*Message, 0),
+		customerMessages = &dto.CustomerMessages{
+			Messages: make([]*dto.Message, 0),
 		}
 		f.Data[user] = customerMessages
 	}
 	customerMessages.Messages = append(customerMessages.Messages, message)
-}
-
-// CustomerMessages 跟某个用户的所有交谈消息集合，包含客户->客服的、客服->客户的
-type CustomerMessages struct {
-	Messages []*Message
-}
-
-// Message 一条交谈消息
-type Message struct {
-	User         string `json:"user"`          // 谁发的消息
-	Text         string `json:"text"`          // 消息文本
-	FromCustomer bool   `json:"from_customer"` // true = 客户发的消息；false = 客服发的消息
-	Ts           int64  `json:"ts"`            // 时间戳
-}
-
-// GetLatestMessage 获取最新一条消息
-func (c *CustomerMessages) GetLatestMessage() *Message {
-	return c.Messages[len(c.Messages)-1]
 }

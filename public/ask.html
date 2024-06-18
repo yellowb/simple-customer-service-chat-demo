@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>问问题</title>
+</head>
+<body>
+
+<script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+
+用户ID: <input id="user_id" type="text" name="FirstName" value="Mickey"><br>
+问题: <input id="content" type="text" size="100" name="LastName" value="Mouse"><br>
+<button id="submit_btn">提交</button>
+<button id="refresh_btn">刷新</button>
+
+<p>下面是聊天记录：</p>
+<div class="event-data"></div>
+
+
+<script>
+
+    let renderMsg = function (messages) {
+        let msgStr = "";
+        for (let i = 0; i < messages.length; i++) {
+            let date = new Date(messages[i].ts * 1000)
+            msgStr = msgStr + date.toString() + " : ";
+            if (messages[i].from_customer) {
+                msgStr = msgStr + "(问题)";
+                msgStr = msgStr + messages[i].user + " : ";
+            } else {
+                msgStr = msgStr + "(回答)";
+                msgStr = msgStr + messages[i].helper + " : ";
+            }
+
+            msgStr = msgStr + messages[i].text;
+            msgStr = msgStr + "</br>";
+        }
+        return msgStr;
+    }
+
+    $(document).ready(function () {
+        $("#submit_btn").click(function () {
+            let userId = $("#user_id").val();
+            let content = $("#content").val();
+
+            $.ajax({
+                type: 'POST',
+                url: 'api/add_message',
+                data: JSON.stringify({user: userId, text: content, from_customer: true}),
+                // success: function(data) { console.log('data: ' + data); },
+                contentType: "application/json",
+                dataType: 'json'
+            })
+                .done(function (data) {
+                    console.log('data: ' + data);
+                });
+        });
+
+
+        $("#refresh_btn").click(function () {
+            let userId = $("#user_id").val();
+            $.ajax({
+                type: 'GET',
+                url: 'api/messages?user_id=' + userId,
+                // data: JSON.stringify({user: userId, text: content}),
+                // success: function(data) { console.log('data: ' + data); },
+                contentType: "application/json",
+                dataType: 'json'
+            })
+                .done(function (data) {
+                    $('.event-data').empty()
+
+                    let allMsgText = renderMsg(data.messages)
+                    $('.event-data').append(allMsgText)
+                });
+        });
+
+    });
+
+
+</script>
+
+</body>
+</html>

@@ -9,7 +9,10 @@ import (
 
 func RegisterCustomerServiceRouter(rg *gin.RouterGroup) {
 	sseHandler := handler.NewSSEventStreamHandler(stream_server.GetSSEventStreamServer())
+	csHandler := handler.NewCustomerServiceHandler(stream_server.GetSSEventStreamServer())
 
 	rg.GET("/stream", middleware.AddSSEventHeader(), sseHandler.AcceptNewClient())
+	rg.POST("/add_message", csHandler.AddMessage)
+	rg.GET("/messages", csHandler.GetMessagesByUser)
 
 }

@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 	"yellowb.com/chat-demo/router"
-	"yellowb.com/chat-demo/stream_server"
 )
 
 func main() {
@@ -37,17 +36,17 @@ func main() {
 	}()
 
 	// TODO: 后面删掉
-	go func() {
-		streamServer := stream_server.GetSSEventStreamServer()
-		for {
-			time.Sleep(time.Second * 10)
-			now := time.Now().Format("2006-01-02 15:04:05")
-			currentTime := fmt.Sprintf("The Current Time Is %v", now)
-
-			// Send current time to clients message channel
-			streamServer.Message <- currentTime
-		}
-	}()
+	//go func() {
+	//	streamServer := stream_server.GetSSEventStreamServer()
+	//	for {
+	//		time.Sleep(time.Second * 10)
+	//		now := time.Now().Format("2006-01-02 15:04:05")
+	//		currentTime := fmt.Sprintf("The Current Time Is %v", now)
+	//
+	//		// Send current time to clients message channel
+	//		streamServer.Message <- currentTime
+	//	}
+	//}()
 
 	// graceful shutdown...
 	quit := make(chan os.Signal)
