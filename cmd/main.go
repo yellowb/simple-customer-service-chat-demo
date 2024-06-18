@@ -23,8 +23,8 @@ func main() {
 	webServer := &http.Server{
 		Addr:           ":8085",
 		Handler:        r,
-		ReadTimeout:    3 * time.Minute,
-		WriteTimeout:   3 * time.Minute,
+		ReadTimeout:    30 * time.Minute,
+		WriteTimeout:   30 * time.Minute,
 		IdleTimeout:    30 * time.Minute,
 		MaxHeaderBytes: http.DefaultMaxHeaderBytes,
 	}

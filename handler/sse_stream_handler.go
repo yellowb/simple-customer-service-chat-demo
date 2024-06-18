@@ -24,9 +24,8 @@ func NewSSEventStreamHandler(streamServer *stream_server.SSEventStreamServer) *S
 // AcceptNewClient 接受一个新的客户端连上来
 func (h *SSEventStreamHandler) AcceptNewClient() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		currentCount := h.counter.Load()
+		currentCount := h.counter.Add(1)
 		streamId := fmt.Sprintf("StreamID-%d", currentCount)
-		h.counter.Add(1)
 
 		// Initialize client channel
 		clientChan := make(stream_server.ClientChan)

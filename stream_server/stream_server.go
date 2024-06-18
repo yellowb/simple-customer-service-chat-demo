@@ -3,6 +3,11 @@ package stream_server
 import (
 	"log"
 	"sync"
+	"time"
+)
+
+const (
+	heartbeatInterval = time.Second * 15 // 心跳保活间隔
 )
 
 type ClientChan chan string
@@ -42,8 +47,10 @@ func GetSSEventStreamServer() *SSEventStreamServer {
 
 func (s *SSEventStreamServer) run() {
 	go s.listen()
+	go s.keepAlive()
 }
 
+// 监听新客户端链接，并把每一条消息广播到所有客户端
 func (s *SSEventStreamServer) listen() {
 	for {
 		select {
@@ -64,5 +71,16 @@ func (s *SSEventStreamServer) listen() {
 				clientMessageChan <- eventMsg
 			}
 		}
+	}
+}
+
+// 定期广播心跳消息到所有客户端以保证链接存活
+func (s *SSEventStreamServer) keepAlive() {
+	ticker := time.NewTicker(heartbeatInterval)
+	defer ticker.Stop()
+
+	for {
+		<-ticker.C
+		s.Message <- "heartbeat"
 	}
 }
