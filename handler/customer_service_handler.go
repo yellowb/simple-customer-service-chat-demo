@@ -43,7 +43,13 @@ func (h *CustomerServiceHandler) AddMessage(ctx *gin.Context) {
 // GetMessagesByUser 获取特定客户的所有对话记录
 func (h *CustomerServiceHandler) GetMessagesByUser(ctx *gin.Context) {
 	userId := ctx.Query("user_id")
-	msgList := h.db.GetCustomerMessages(userId)
+	msgList, err := h.db.GetCustomerMessages(userId)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
 	if msgList == nil {
 		// 找不到，返回空对象
 		msgList = new(dto.CustomerMessages)

@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"yellowb.com/chat-demo/client/redis_client"
 	"yellowb.com/chat-demo/router"
 )
 
@@ -61,8 +62,11 @@ func main() {
 	<-quit
 	log.Println("[main] shutdown web server ...")
 
+	// 清除redis中的内容
+	redis_client.GetClient().Client.FlushDB(context.Background()).Result()
+
 	// 关闭WebServer
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := webServer.Shutdown(ctx); err != nil {
 		log.Fatal("[main] server shutdown: ", err)
