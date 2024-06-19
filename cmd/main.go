@@ -64,6 +64,7 @@ func main() {
 
 	// 清除redis中的内容
 	redis_client.GetClient().Client.FlushDB(context.Background()).Result()
+	log.Println("[main] clear redis data ...")
 
 	// 关闭WebServer
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
