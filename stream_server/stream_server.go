@@ -1,9 +1,13 @@
 package stream_server
 
 import (
+	"context"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"sync"
 	"time"
+	"yellowb.com/chat-demo/client/redis_client"
+	"yellowb.com/chat-demo/constants"
 )
 
 const (
@@ -26,8 +30,11 @@ var (
 
 // SSEventStreamServer SSE推流服务器
 type SSEventStreamServer struct {
+	// 心跳消息入口
+	Heartbeat chan *SSEvent
+
 	// Events are pushed to this channel by the main events-gathering routine
-	Message ClientChan
+	Message chan *SSEvent
 
 	// New client connections
 	NewClients chan ClientChan
@@ -37,15 +44,20 @@ type SSEventStreamServer struct {
 
 	// Total client connections
 	TotalClients map[ClientChan]bool
+
+	// Redis client
+	redisClient *redis_client.Client
 }
 
 func GetSSEventStreamServer() *SSEventStreamServer {
 	once.Do(func() {
 		server = &SSEventStreamServer{
+			Heartbeat:     make(chan *SSEvent),
 			Message:       make(chan *SSEvent),
 			NewClients:    make(chan ClientChan),
 			ClosedClients: make(chan ClientChan),
 			TotalClients:  make(map[ClientChan]bool),
+			redisClient:   redis_client.GetClient(),
 		}
 		server.run() // 创建时即启动监听
 	})
@@ -55,6 +67,7 @@ func GetSSEventStreamServer() *SSEventStreamServer {
 func (s *SSEventStreamServer) run() {
 	go s.listen()
 	go s.keepAlive()
+	go s.subscribeToRedis()
 }
 
 // 监听新客户端链接，并把每一条消息广播到所有客户端
@@ -77,6 +90,12 @@ func (s *SSEventStreamServer) listen() {
 			for clientMessageChan := range s.TotalClients {
 				clientMessageChan <- eventMsg
 			}
+
+			// 广播心跳信号
+		case heartbeatMsg := <-s.Heartbeat:
+			for clientMessageChan := range s.TotalClients {
+				clientMessageChan <- heartbeatMsg
+			}
 		}
 	}
 }
@@ -88,8 +107,28 @@ func (s *SSEventStreamServer) keepAlive() {
 
 	for {
 		<-ticker.C
-		s.Message <- &SSEvent{
+		s.Heartbeat <- &SSEvent{
 			Type: "heartbeat",
 		}
 	}
+}
+
+func (s *SSEventStreamServer) subscribeToRedis() {
+	subscriber := s.redisClient.Client.Subscribe(context.Background(), constants.CustomerServiceMsgNotifyChan)
+	defer subscriber.Close()
+
+	ch := subscriber.Channel(redis.WithChannelSize(1000), redis.WithChannelSendTimeout(5*time.Second))
+
+	// 如果Redis Chan中没有数据，这里会被堵塞
+	for msg := range ch {
+		s.Message <- &SSEvent{
+			Type: "message",
+			Body: msg.Payload,
+		}
+	}
+}
+
+func (s *SSEventStreamServer) PublishToRedis(payload string) error {
+	err := s.redisClient.Client.Publish(context.Background(), constants.CustomerServiceMsgNotifyChan, payload).Err()
+	return err
 }

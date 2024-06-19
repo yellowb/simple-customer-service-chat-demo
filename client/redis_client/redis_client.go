@@ -3,6 +3,7 @@ package redis_client
 import (
 	"context"
 	"github.com/redis/go-redis/v9"
+	"sync"
 	"time"
 )
 
@@ -11,8 +12,20 @@ const (
 	db   = 0
 )
 
+var (
+	once   sync.Once
+	client *Client
+)
+
 type Client struct {
-	client *redis.Client
+	Client *redis.Client
+}
+
+func GetClient() *Client {
+	once.Do(func() {
+		client, _ = NewClient()
+	})
+	return client
 }
 
 func NewClient() (*Client, error) {
@@ -30,6 +43,6 @@ func NewClient() (*Client, error) {
 		return nil, err
 	}
 	return &Client{
-		client: client,
+		Client: client,
 	}, nil
 }

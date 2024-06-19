@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,14 +14,20 @@ import (
 	"yellowb.com/chat-demo/router"
 )
 
+var (
+	port = flag.Int("p", 8085, "The port to listen on")
+)
+
 func main() {
+	flag.Parse()
+
 	// start api server...
 	r, err := router.InitRouter()
 	if err != nil {
 		panic(fmt.Sprintf("[main] init router error: %s", err.Error()))
 	}
 	webServer := &http.Server{
-		Addr:           ":8085",
+		Addr:           fmt.Sprintf(":%d", *port),
 		Handler:        r,
 		ReadTimeout:    30 * time.Minute,
 		WriteTimeout:   30 * time.Minute,
@@ -55,7 +62,7 @@ func main() {
 	log.Println("[main] shutdown web server ...")
 
 	// 关闭WebServer
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	if err := webServer.Shutdown(ctx); err != nil {
 		log.Fatal("[main] server shutdown: ", err)

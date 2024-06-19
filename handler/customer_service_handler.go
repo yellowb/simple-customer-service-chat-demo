@@ -33,10 +33,7 @@ func (h *CustomerServiceHandler) AddMessage(ctx *gin.Context) {
 	h.db.SaveCustomerMessage(msg.User, msg)
 
 	// 广播消息
-	h.streamServer.Message <- &stream_server.SSEvent{
-		Type: "message",
-		Body: "hey",
-	}
+	h.streamServer.PublishToRedis("hey")
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "ok",
