@@ -7,7 +7,7 @@ type CustomerMessages struct {
 
 // Message 一条交谈消息
 type Message struct {
-	User         string `json:"user"`          // 客户ID
+	User         string `json:"user"`          // 客户ID（提问和回答时都不为空）
 	Helper       string `json:"helper"`        // 客服ID（客户发问时为空）
 	Text         string `json:"text"`          // 消息文本
 	FromCustomer bool   `json:"from_customer"` // true = 客户发的消息；false = 客服发的消息

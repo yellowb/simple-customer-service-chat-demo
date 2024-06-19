@@ -7,7 +7,6 @@ func InitRouter() (*gin.Engine, error) {
 	gin.SetMode(gin.DebugMode)
 
 	// 静态html文件
-	r.StaticFile("/", "./public/index.html")
 	r.StaticFile("/ask", "./public/ask.html")
 	r.StaticFile("/answer", "./public/answer.html")
 

@@ -31,7 +31,7 @@ func main() {
 		Addr:           fmt.Sprintf(":%d", *port),
 		Handler:        r,
 		ReadTimeout:    30 * time.Minute,
-		WriteTimeout:   30 * time.Minute,
+		WriteTimeout:   30 * time.Minute, // 这个可以适当调大，不然每过一段时间客户端就好被断开一次，不过也无大碍
 		IdleTimeout:    30 * time.Minute,
 		MaxHeaderBytes: http.DefaultMaxHeaderBytes,
 	}
@@ -42,19 +42,6 @@ func main() {
 			log.Printf("[main] start web server error: %v", err)
 		}
 	}()
-
-	// TODO: 后面删掉
-	//go func() {
-	//	streamServer := stream_server.GetSSEventStreamServer()
-	//	for {
-	//		time.Sleep(time.Second * 10)
-	//		now := time.Now().Format("2006-01-02 15:04:05")
-	//		currentTime := fmt.Sprintf("The Current Time Is %v", now)
-	//
-	//		// Send current time to clients message channel
-	//		streamServer.Message <- currentTime
-	//	}
-	//}()
 
 	// graceful shutdown...
 	quit := make(chan os.Signal)

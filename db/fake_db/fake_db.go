@@ -19,16 +19,14 @@ var (
 	db   *FakeDb
 )
 
-// FakeDb 假的DB
+// FakeDb 假的DB，跟每一个客户的交谈消息都保存在redis中
 type FakeDb struct {
-	Data        map[string]*dto.CustomerMessages // 跟所有客户的交谈记录。key = 客户user id
 	redisClient *redis_client.Client
 }
 
 func GetFakeDb() *FakeDb {
 	once.Do(func() {
 		db = &FakeDb{
-			Data:        make(map[string]*dto.CustomerMessages),
 			redisClient: redis_client.GetClient(),
 		}
 	})
@@ -70,17 +68,8 @@ func (f *FakeDb) SaveCustomerMessage(user string, message *dto.Message) error {
 	customerMessages.Messages = append(customerMessages.Messages, message)
 
 	marshal, _ := json.Marshal(customerMessages)
+	// redis中的value就是整个dto.CustomerMessages的json序列化字符串
 	err = f.redisClient.Client.SetEx(context.Background(), fmt.Sprintf("%s%s", constants.CustomerMsgPrefix, user), string(marshal), 5*time.Minute).Err()
 
 	return err
-
-	//var customerMessages *dto.CustomerMessages
-	//// 如果某个客户从来没交谈过，则新建
-	//if customerMessages = f.Data[user]; customerMessages == nil {
-	//	customerMessages = &dto.CustomerMessages{
-	//		Messages: make([]*dto.Message, 0),
-	//	}
-	//	f.Data[user] = customerMessages
-	//}
-	//customerMessages.Messages = append(customerMessages.Messages, message)
 }

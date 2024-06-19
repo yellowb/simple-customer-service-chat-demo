@@ -33,7 +33,7 @@ type SSEventStreamServer struct {
 	// 心跳消息入口
 	Heartbeat chan *SSEvent
 
-	// Events are pushed to this channel by the main events-gathering routine
+	// 用户新消息提醒入口
 	Message chan *SSEvent
 
 	// New client connections
@@ -64,28 +64,29 @@ func GetSSEventStreamServer() *SSEventStreamServer {
 	return server
 }
 
+// 启动
 func (s *SSEventStreamServer) run() {
 	go s.listen()
 	go s.keepAlive()
 	go s.subscribeToRedis()
 }
 
-// 监听新客户端链接，并把每一条消息广播到所有客户端
+// 监听新客户端链接、旧链接断开、消息与心跳的广播
 func (s *SSEventStreamServer) listen() {
 	for {
 		select {
-		// Add new available client
+		// 有新的客户端建立链接
 		case client := <-s.NewClients:
 			s.TotalClients[client] = true
 			log.Printf("Client added. %d registered clients", len(s.TotalClients))
 
-		// Remove closed client
+		// 有旧的客户端断开链接
 		case client := <-s.ClosedClients:
 			delete(s.TotalClients, client)
 			close(client)
 			log.Printf("Removed client. %d registered clients", len(s.TotalClients))
 
-		// Broadcast message to client
+		// 有新消息要广播给所有客户端（业务消息）
 		case eventMsg := <-s.Message:
 			for clientMessageChan := range s.TotalClients {
 				clientMessageChan <- eventMsg
@@ -113,13 +114,17 @@ func (s *SSEventStreamServer) keepAlive() {
 	}
 }
 
+// 订阅redis的channel以接收有客户发送新消息的通知
 func (s *SSEventStreamServer) subscribeToRedis() {
 	subscriber := s.redisClient.Client.Subscribe(context.Background(), constants.CustomerServiceMsgNotifyChan)
 	defer subscriber.Close()
 
-	ch := subscriber.Channel(redis.WithChannelSize(1000), redis.WithChannelSendTimeout(5*time.Second))
+	ch := subscriber.Channel(
+		redis.WithChannelSize(1000),                 // redis client go channel的容量，缓冲
+		redis.WithChannelSendTimeout(5*time.Second), // 如果redis client go channel满了，最多等多久后会把新消息丢弃
+	)
 
-	// 如果Redis Chan中没有数据，这里会被堵塞
+	// 如果Redis Channel中没有数据，这里循环会被堵塞
 	for msg := range ch {
 		s.Message <- &SSEvent{
 			Type: "message",
@@ -128,6 +133,8 @@ func (s *SSEventStreamServer) subscribeToRedis() {
 	}
 }
 
+// PublishToRedis 向redis的channel发消息广播给所有SSE server知道有新的用户消息
+// PS：这个函数不应该写在SSE server里，而是应该写在customer service中，暂时没有那个文件，先堆在这
 func (s *SSEventStreamServer) PublishToRedis(payload string) error {
 	err := s.redisClient.Client.Publish(context.Background(), constants.CustomerServiceMsgNotifyChan, payload).Err()
 	return err
